@@ -1,0 +1,9 @@
+.cpcache/
+.lsp/
+.clj-kondo/.cache/
+resources/logs/
+resources/scope_runs/
+scope_runs/
+fsm.journal.clj
+runtime_ledger.clj
+
