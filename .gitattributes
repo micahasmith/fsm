@@ -12,7 +12,7 @@
 *.csv filter=git-crypt diff=git-crypt
 *.tsv filter=git-crypt diff=git-crypt
 *.R filter=git-crypt diff=git-crypt
+*.py filter=git-crypt diff=git-crypt
 *.sh filter=git-crypt diff=git-crypt
 deps.edn filter=git-crypt diff=git-crypt
 Makefile filter=git-crypt diff=git-crypt
-
