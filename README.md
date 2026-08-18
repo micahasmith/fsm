@@ -26,9 +26,11 @@ This architecture unlocks four core capabilities for LLM-driven orchestration:
   - [1. Scopes](#1-scopes)
   - [2. Contexts & Handlers](#2-contexts--handlers)
   - [3. Submitting Runs](#3-submitting-runs)
+- [Request/Response and Context Safety](#requestresponse-and-context-safety)
 - [The Transaction Journal: Format, Mechanics, and Story](#the-transaction-journal-format-mechanics-and-story)
 - [Hierarchical Scopes: Parent/Child Lineage & Context Inheritance](#hierarchical-scopes-parentchild-lineage--context-inheritance)
 - [Package Extensions](#package-extensions)
+- [Current Status and Next Milestone](#current-status-and-next-milestone)
 - [Getting Started & Usage](#getting-started--usage)
 - [Testing & Validation](#testing--validation)
 
@@ -113,6 +115,23 @@ You run state machines using the `run!` macro:
 ```clojure
 (run! :matrix/profile {:artifact "data/toy.csv"})
 ```
+
+---
+
+## Request/Response and Context Safety
+
+FSM is designed as a conversational interpreter, not a mutable workflow graph. A caller appends a declaration, request, run, or selection; the runtime derives and appends the corresponding response. This keeps both intent and the system's interpretation of that intent replayable.
+
+The primary flows are:
+
+* **Definitions** declare scopes, contexts, handlers, guards, imports, and permitted choices.
+* **Requests** assert an event and its payload. **Runs** invoke an executable scope directly.
+* **Responses** record guard results, implications, emitted events, accepted transitions, or a required choice.
+* **Selections** resolve a pending choice explicitly; invalid selections are recorded as rejected responses rather than silently changed.
+
+Contexts are first-class safety boundaries. Names are context-local, and cross-context information must be represented as an explicit typed pull. The runtime records a derived immutable context frame for every handler evaluation, including the pulls used, path hits, score breakdown, and total score.
+
+Supported pull types are `:file`, `:global-immutable`, `:process`, `:derived`, `:external`, and `:historical`. Their cost, symbol count, fan-in, path-hit history, and branch ambiguity contribute to the context score. A score above the scope budget blocks automatic progression; multiple valid choices also require an explicit `select` form. This makes the reason a transition was accepted, blocked, or deferred visible in the journal.
 
 ---
 
@@ -219,6 +238,26 @@ The framework is extended via specialized modules residing under the `packages/`
 
 ---
 
+## Current Status and Next Milestone
+
+The runtime, journal replay, scoped filesystem layout, context scoring, CLI/REPL interface, matrix package, and code package are implemented and covered by unit and end-to-end tests. Both template packages follow the same artifact pipeline:
+
+```text
+source artifact -> profile -> raw view -> normalized view -> candidate-path artifact
+```
+
+The matrix package profiles CSV input with R, preserves inferred column metadata, normalizes typed values, reflects the available R operation inventory, and enumerates deterministic analysis paths. The code package parses Clojure source into operation occurrences, including source location, enclosing definition, arguments, and adjacency metadata; it then derives code-analysis paths such as call-frequency, namespace-usage, argument-shape, and sequential-adjacency analysis.
+
+The next implementation milestone is to close the candidate-path safety loop:
+
+```text
+candidate-path artifact -> choice-required response -> explicit select -> scoped execution -> historical result artifact
+```
+
+Candidate paths should remain structured data with stable string IDs (for example, `code.path/profile-call-frequency/str`) rather than being converted into ad hoc dynamic keywords. The runtime should journal the offered candidates, accept or reject a selected ID, instantiate the selected scope only after acceptance, and persist the result alongside the path history. This preserves deterministic replay while leaving execution of each concrete analysis operation explicit and auditable.
+
+---
+
 ## Getting Started & Usage
 
 All common operations are automated and packaged into the root-level `Makefile`.
@@ -242,9 +281,9 @@ Run commands via `make <target>`:
 
 ```bash
 make run                      # Show app usage and options
-make REPL                     # Start a standard Clojure REPL
+make repl                     # Start a standard Clojure REPL
 make cmd-repl                 # Start the FSM interactive command-line REPL
-make linter                   # Lint all files with clj-kondo
+make lint                     # Lint all files with clj-kondo
 make test                     # Run the core unit tests
 make e2e                      # Run the comprehensive integration and smoke tests
 make clean                    # Remove local run and logging files
